@@ -24,6 +24,7 @@
 gboolean instrument_tracing = false;
 gboolean instrument_optimize = false;
 gboolean instrument_unique = false;
+gboolean instrument_suppression = false;
 guint64  instrument_hash_zero = 0;
 guint64  instrument_hash_seed = 0;
 
@@ -247,6 +248,7 @@ void instrument_config(void) {
   instrument_unique = (getenv("AFL_FRIDA_INST_TRACE_UNIQUE") != NULL);
   instrument_use_fixed_seed = (getenv("AFL_FRIDA_INST_SEED") != NULL);
   instrument_fixed_seed = util_read_num("AFL_FRIDA_INST_SEED");
+  instrument_suppression = (getenv("AFL_FRIDA_INST_SUPPRESS") != NULL);
   instrument_coverage_unstable_filename =
       (getenv("AFL_FRIDA_INST_UNSTABLE_COVERAGE_FILE"));
 
@@ -266,6 +268,7 @@ void instrument_init(void) {
   OKF("Instrumentation - unique [%c]", instrument_unique ? 'X' : ' ');
   OKF("Instrumentation - fixed seed [%c] [0x%016" G_GINT64_MODIFIER "x]",
       instrument_use_fixed_seed ? 'X' : ' ', instrument_fixed_seed);
+  OKF("Instrumentation - suppress [%c]", instrument_suppression ? 'X' : ' ');
   OKF("Instrumentation - unstable coverage [%c] [%s]",
       instrument_coverage_unstable_filename == NULL ? ' ' : 'X',
       instrument_coverage_unstable_filename);
@@ -292,6 +295,13 @@ void instrument_init(void) {
   }
 
   if (instrument_unique) { instrument_tracing = TRUE; }
+
+  if (instrument_suppression && !instrument_optimize) {
+
+    FATAL(
+        "AFL_FRIDA_INST_SUPPRESS and AFL_FRIDA_INST_NO_OPTIMIZE incompatible");
+
+  }
 
   if (__afl_map_size != 0x10000) {
 
