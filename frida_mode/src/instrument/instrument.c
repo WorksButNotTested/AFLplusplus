@@ -344,7 +344,7 @@ void instrument_init(void) {
 
     instrument_index_map =
         mmap(NULL, BIGMAP_SIZE * sizeof(guint16), PROT_READ | PROT_WRITE,
-             MAP_SHARED | MAP_ANONYMOUS | MAP_HUGETLB | MAP_HUGE_1GB, -1, 0);
+             MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (instrument_index_map == MAP_FAILED) {
 
       FATAL("Failed to create memory for BIGMAP mode - errno: %d\n", errno);
