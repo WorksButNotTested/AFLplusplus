@@ -21,6 +21,16 @@
 #include "stats.h"
 #include "util.h"
 
+#define HUGETLB_FLAG_ENCODE_SHIFT 26
+#define SHM_HUGE_SHIFT HUGETLB_FLAG_ENCODE_SHIFT
+#define SHM_HUGE_2MB (21 << SHM_HUGE_SHIFT)
+#define SHM_HUGE_1GB (30 << SHM_HUGE_SHIFT)
+
+#define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
+#define MAP_HUGE_1GB (30 << MAP_HUGE_SHIFT)
+
+#define BIGMAP_SIZE (1ULL << 30)
+
 gboolean instrument_tracing = false;
 gboolean instrument_optimize = false;
 gboolean instrument_unique = false;
@@ -29,6 +39,10 @@ guint64  instrument_hash_seed = 0;
 
 gboolean instrument_use_fixed_seed = FALSE;
 guint64  instrument_fixed_seed = 0;
+
+gboolean instrument_bigmap = false;
+guint16 *instrument_index_map = MAP_FAILED;
+guint16  instrument_bigmap_cnt = 0;
 
 static GumStalkerTransformer *transformer = NULL;
 
@@ -60,7 +74,16 @@ guint64 instrument_get_offset_hash(GumAddress current_rip) {
 
   guint64 area_offset = hash64((unsigned char *)&current_rip,
                                sizeof(GumAddress), instrument_hash_seed);
-  return area_offset &= MAP_SIZE - 1;
+
+  if (instrument_bigmap) {
+
+    return area_offset &= BIGMAP_SIZE - 1;
+
+  } else {
+
+    return area_offset &= MAP_SIZE - 1;
+
+  }
 
 }
 
@@ -224,6 +247,7 @@ void instrument_config(void) {
   instrument_unique = (getenv("AFL_FRIDA_INST_TRACE_UNIQUE") != NULL);
   instrument_use_fixed_seed = (getenv("AFL_FRIDA_INST_SEED") != NULL);
   instrument_fixed_seed = util_read_num("AFL_FRIDA_INST_SEED");
+  instrument_bigmap = (getenv("AFL_FRIDA_INST_BIGMAP") != NULL);
 
   instrument_debug_config();
   instrument_coverage_config();
@@ -241,6 +265,7 @@ void instrument_init(void) {
   OKF("Instrumentation - unique [%c]", instrument_unique ? 'X' : ' ');
   OKF("Instrumentation - fixed seed [%c] [0x%016" G_GINT64_MODIFIER "x]",
       instrument_use_fixed_seed ? 'X' : ' ', instrument_fixed_seed);
+  OKF("Instrumentation - bigmap [%c]", instrument_bigmap ? 'X' : ' ');
 
   if (instrument_tracing && instrument_optimize) {
 
@@ -314,6 +339,21 @@ void instrument_init(void) {
   OKF("Instrumentation - seed [0x%016" G_GINT64_MODIFIER "x]",
       instrument_hash_seed);
   instrument_hash_zero = instrument_get_offset_hash(0);
+
+  if (instrument_bigmap) {
+
+    instrument_index_map =
+        mmap(NULL, BIGMAP_SIZE * sizeof(guint16), PROT_READ | PROT_WRITE,
+             MAP_SHARED | MAP_ANONYMOUS | MAP_HUGETLB | MAP_HUGE_1GB, -1, 0);
+    if (instrument_index_map == MAP_FAILED) {
+
+      FATAL("Failed to create memory for BIGMAP mode - errno: %d\n", errno);
+
+    }
+
+    memset(instrument_index_map, 0xff, BIGMAP_SIZE * sizeof(guint16));
+
+  }
 
   instrument_debug_init();
   instrument_coverage_init();
