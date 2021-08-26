@@ -21,16 +21,6 @@
 #include "stats.h"
 #include "util.h"
 
-#define HUGETLB_FLAG_ENCODE_SHIFT 26
-#define SHM_HUGE_SHIFT HUGETLB_FLAG_ENCODE_SHIFT
-#define SHM_HUGE_2MB (21 << SHM_HUGE_SHIFT)
-#define SHM_HUGE_1GB (30 << SHM_HUGE_SHIFT)
-
-#define MAP_HUGE_2MB (21 << MAP_HUGE_SHIFT)
-#define MAP_HUGE_1GB (30 << MAP_HUGE_SHIFT)
-
-#define BIGMAP_SIZE (1ULL << 30)
-
 gboolean instrument_tracing = false;
 gboolean instrument_optimize = false;
 gboolean instrument_unique = false;
@@ -40,7 +30,8 @@ guint64  instrument_hash_seed = 0;
 gboolean instrument_use_fixed_seed = FALSE;
 guint64  instrument_fixed_seed = 0;
 
-gboolean instrument_bigmap = false;
+guint    instrument_bigmap_size = 0;
+guint    instrument_bigmap_log2_entries = 0;
 guint16 *instrument_index_map = MAP_FAILED;
 guint16  instrument_bigmap_cnt = 0;
 
@@ -75,13 +66,13 @@ guint64 instrument_get_offset_hash(GumAddress current_rip) {
   guint64 area_offset = hash64((unsigned char *)&current_rip,
                                sizeof(GumAddress), instrument_hash_seed);
 
-  if (instrument_bigmap) {
+  if (instrument_bigmap_size == 0) {
 
-    return area_offset &= BIGMAP_SIZE - 1;
+    return area_offset &= MAP_SIZE - 1;
 
   } else {
 
-    return area_offset &= MAP_SIZE - 1;
+    return area_offset &= ((1 << instrument_bigmap_log2_entries) - 1);
 
   }
 
@@ -247,7 +238,7 @@ void instrument_config(void) {
   instrument_unique = (getenv("AFL_FRIDA_INST_TRACE_UNIQUE") != NULL);
   instrument_use_fixed_seed = (getenv("AFL_FRIDA_INST_SEED") != NULL);
   instrument_fixed_seed = util_read_num("AFL_FRIDA_INST_SEED");
-  instrument_bigmap = (getenv("AFL_FRIDA_INST_BIGMAP") != NULL);
+  instrument_bigmap_size = util_read_num("AFL_FRIDA_INST_BIGMAP");
 
   instrument_debug_config();
   instrument_coverage_config();
@@ -265,7 +256,8 @@ void instrument_init(void) {
   OKF("Instrumentation - unique [%c]", instrument_unique ? 'X' : ' ');
   OKF("Instrumentation - fixed seed [%c] [0x%016" G_GINT64_MODIFIER "x]",
       instrument_use_fixed_seed ? 'X' : ' ', instrument_fixed_seed);
-  OKF("Instrumentation - bigmap [%c]", instrument_bigmap ? 'X' : ' ');
+  OKF("Instrumentation - bigmap [%c] max size [%u]",
+      instrument_bigmap_size == 0 ? ' ' : 'X', instrument_bigmap_size);
 
   if (instrument_tracing && instrument_optimize) {
 
@@ -288,6 +280,30 @@ void instrument_init(void) {
     FATAL("Bad map size: 0x%08x", __afl_map_size);
 
   }
+
+  if (instrument_bigmap_size != 0) {
+
+    for (guint i = 1; i < 63; i++) {
+      if ((1ULL << i) > instrument_bigmap_size) { break; }
+      instrument_bigmap_log2_entries = i - 1;
+    }
+
+    if (instrument_bigmap_log2_entries < 17) {
+
+      FATAL("Bigmap size should be at least 256Kb");
+
+    }
+
+    if (instrument_bigmap_log2_entries > 35) {
+
+      FATAL("Bigmap size should be at most 64Gb");
+
+    }
+
+  }
+
+  OKF("Instrumentation - bigmap entries [%u] [2 ^ %u]",
+      1 << instrument_bigmap_log2_entries, instrument_bigmap_log2_entries);
 
   transformer = gum_stalker_transformer_make_from_callback(
       instrument_basic_block, NULL, NULL);
@@ -340,18 +356,18 @@ void instrument_init(void) {
       instrument_hash_seed);
   instrument_hash_zero = instrument_get_offset_hash(0);
 
-  if (instrument_bigmap) {
+  if (instrument_bigmap_size != 0) {
 
-    instrument_index_map =
-        mmap(NULL, BIGMAP_SIZE * sizeof(guint16), PROT_READ | PROT_WRITE,
-             MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    size_t map_size = (1 << instrument_bigmap_log2_entries) * sizeof(guint16);
+    instrument_index_map = mmap(NULL, map_size, PROT_READ | PROT_WRITE,
+                                MAP_SHARED | MAP_ANONYMOUS, -1, 0);
     if (instrument_index_map == MAP_FAILED) {
 
       FATAL("Failed to create memory for BIGMAP mode - errno: %d\n", errno);
 
     }
 
-    memset(instrument_index_map, 0xff, BIGMAP_SIZE * sizeof(guint16));
+    memset(instrument_index_map, 0xff, map_size);
 
   }
 

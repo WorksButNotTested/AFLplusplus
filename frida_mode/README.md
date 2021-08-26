@@ -154,6 +154,12 @@ Generated block 0x7ffff75e98e2
 
 ***
 ```
+* `AFL_FRIDA_INST_BIGMAP` - Enable `bigmap` mode (supported on x64 only) and set
+the maximum memory usage in bytes to the specified decimal value. If the value
+is not a power of two, then the actual memory consumption is rounded down. The
+size must be between `256Kb` and `64Gb`. Each entry in the `bigmap` is two bytes
+(the coverage bitmap is `64Kb` and hence has `16-bit` indexes), thus the number
+of entries in this map is `log2(size) / 2`.
 * `AFL_FRIDA_INST_JIT` - Enable the instrumentation of Just-In-Time compiled
 code. Code is considered to be JIT if the executable segment is not backed by a
 file.

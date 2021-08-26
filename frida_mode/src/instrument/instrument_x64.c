@@ -123,13 +123,13 @@ static void instrument_coverate_write_function(GumStalkerOutput *output) {
 
     gum_x86_writer_put_jmp_near_label(cw, after_log_impl);
 
-    if (instrument_bigmap) {
+    if (instrument_bigmap_size == 0) {
 
-      misalign = ((cw->pc + sizeof(afl_log_code_bigmap)) & 0x7);
+      misalign = ((cw->pc + sizeof(afl_log_code)) & 0x7);
 
     } else {
 
-      misalign = ((cw->pc + sizeof(afl_log_code)) & 0x7);
+      misalign = ((cw->pc + sizeof(afl_log_code_bigmap)) & 0x7);
 
     }
 
@@ -140,20 +140,27 @@ static void instrument_coverate_write_function(GumStalkerOutput *output) {
     }
 
     current_log_impl = cw->pc;
-    if (instrument_bigmap) {
+    if (instrument_bigmap_size == 0) {
 
-      gum_x86_writer_put_bytes(cw, afl_log_code_bigmap,
-                               sizeof(afl_log_code_bigmap));
+      gum_x86_writer_put_bytes(cw, afl_log_code, sizeof(afl_log_code));
 
     } else {
 
-      gum_x86_writer_put_bytes(cw, afl_log_code, sizeof(afl_log_code));
+      gum_x86_writer_put_bytes(cw, afl_log_code_bigmap,
+                               sizeof(afl_log_code_bigmap));
 
     }
 
     uint64_t *afl_prev_loc_ptr = &instrument_previous_pc;
 
-    if (instrument_bigmap) {
+    if (instrument_bigmap_size == 0) {
+
+      gum_x86_writer_put_bytes(cw, (const guint8 *)&__afl_area_ptr,
+                               sizeof(__afl_area_ptr));
+      gum_x86_writer_put_bytes(cw, (const guint8 *)&afl_prev_loc_ptr,
+                               sizeof(afl_prev_loc_ptr));
+
+    } else {
 
       uint16_t *instrument_bigmap_cnt_ptr = &instrument_bigmap_cnt;
       gum_x86_writer_put_bytes(cw, (const guint8 *)&afl_prev_loc_ptr,
@@ -164,13 +171,6 @@ static void instrument_coverate_write_function(GumStalkerOutput *output) {
                                sizeof(instrument_bigmap_cnt_ptr));
       gum_x86_writer_put_bytes(cw, (const guint8 *)&__afl_area_ptr,
                                sizeof(__afl_area_ptr));
-
-    } else {
-
-      gum_x86_writer_put_bytes(cw, (const guint8 *)&__afl_area_ptr,
-                               sizeof(__afl_area_ptr));
-      gum_x86_writer_put_bytes(cw, (const guint8 *)&afl_prev_loc_ptr,
-                               sizeof(afl_prev_loc_ptr));
 
     }
 

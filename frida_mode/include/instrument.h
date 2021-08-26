@@ -10,7 +10,7 @@ extern char *           instrument_coverage_filename;
 extern gboolean         instrument_tracing;
 extern gboolean         instrument_optimize;
 extern gboolean         instrument_unique;
-extern gboolean         instrument_bigmap;
+extern guint            instrument_bigmap_size;
 extern __thread guint64 instrument_previous_pc;
 extern guint64          instrument_hash_zero;
 extern guint16 *        instrument_index_map;
