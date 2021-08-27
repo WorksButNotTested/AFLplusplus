@@ -4,7 +4,10 @@
 #include "frida-gumjs.h"
 
 #if defined(__x86_64__)
-gsize ctx_read_reg(GumX64CpuContext *ctx, x86_reg reg);
+gsize     ctx_read_reg(GumX64CpuContext *ctx, x86_reg reg);
+GumCpuReg ctx_get_reg(x86_reg reg);
+gsize     ctx_get_shift(x86_reg reg);
+gsize     ctx_get_mask(x86_reg reg);
 #elif defined(__i386__)
 gsize ctx_read_reg(GumIA32CpuContext *ctx, x86_reg reg);
 #elif defined(__aarch64__)

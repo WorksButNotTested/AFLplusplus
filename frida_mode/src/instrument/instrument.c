@@ -218,7 +218,7 @@ static void instrument_basic_block(GumStalkerIterator *iterator,
     if (likely(!excluded)) {
 
       asan_instrument(instr, iterator);
-      cmplog_instrument(instr, iterator);
+      cmplog_instrument(instr, iterator, output);
 
     }
 

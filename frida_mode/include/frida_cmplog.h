@@ -7,7 +7,8 @@ void cmplog_config(void);
 void cmplog_init(void);
 
 /* Functions to be implemented by the different architectures */
-void cmplog_instrument(const cs_insn *instr, GumStalkerIterator *iterator);
+void cmplog_instrument(const cs_insn *instr, GumStalkerIterator *iterator,
+                       GumStalkerOutput *output);
 
 gboolean cmplog_is_readable(guint64 addr, size_t size);
 

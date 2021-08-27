@@ -264,8 +264,10 @@ static void cmplog_instrument_cmp_sub(const cs_insn *     instr,
 
 }
 
-void cmplog_instrument(const cs_insn *instr, GumStalkerIterator *iterator) {
+void cmplog_instrument(const cs_insn *instr, GumStalkerIterator *iterator,
+                       GumStalkerOutput *output) {
 
+  UNUSED_PARAMETER(output);
   if (__afl_cmp_map == NULL) return;
 
   cmplog_instrument_call(instr, iterator);
